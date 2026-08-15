@@ -1,3 +1,4 @@
+import uuid
 from math import e
 import aiohttp
 import tempfile
@@ -17,6 +18,27 @@ class AudiobookshelfProgress(BaseModel):
     server: str
     token: str
     items: list[AudiobookshelfProgressItem]
+
+
+class AudiobookshelfSessionItem(BaseModel):
+    libraryItemId: str
+    # The watch works in whole seconds; Monkey C's Number is 32-bit, so a
+    # millisecond epoch cannot be represented there. Conversion happens here.
+    updatedAt: int
+    currentTime: float
+    duration: float = 0.0
+    timeListening: int = 0
+    # Stable per listening stretch. Reused across retries so the server
+    # upserts one row instead of double-counting stats.
+    sessionKey: str
+    displayTitle: str = ""
+    displayAuthor: str = ""
+
+
+class AudiobookshelfSessions(BaseModel):
+    server: str
+    token: str
+    items: list[AudiobookshelfSessionItem]
 
 
 class AudiobookshelfAithorizationData(BaseModel):
@@ -308,6 +330,79 @@ async def get_cover(url):
                 )
 
     return None
+
+
+async def sync_sessions(data):
+    url = sanitze_server_name(data.server) + "/api/session/local-all"
+    headers = {
+        "Authorization": f"Bearer {data.token}",
+        "Content-Type": "application/json",
+    }
+
+    sessions = []
+    for item in data.items:
+        # The server compares updatedAt against a JS Date .valueOf(), i.e. a
+        # millisecond epoch. Passing seconds parses as 1970, loses every
+        # comparison, and the sync is dropped with HTTP 200.
+        updated_at_ms = item.updatedAt * 1000
+        progress = 0.0
+        if item.duration > 0:
+            progress = min(item.currentTime / item.duration, 1.0)
+
+        sessions.append(
+            {
+                "id": str(
+                    uuid.uuid5(
+                        uuid.NAMESPACE_URL,
+                        f"abgreen:{item.libraryItemId}:{item.sessionKey}",
+                    )
+                ),
+                "libraryItemId": item.libraryItemId,
+                "mediaType": "book",
+                "currentTime": item.currentTime,
+                "timeListening": item.timeListening,
+                "duration": item.duration,
+                "progress": progress,
+                "startedAt": updated_at_ms - (item.timeListening * 1000),
+                "updatedAt": updated_at_ms,
+                "displayTitle": item.displayTitle,
+                "displayAuthor": item.displayAuthor,
+                "mediaPlayer": "garmin-audiobooks-green",
+                "playMethod": 3,
+            }
+        )
+
+    req_data = {
+        "sessions": sessions,
+        "deviceInfo": {
+            "clientName": "AudiobooksGreen",
+            "deviceType": "watch",
+        },
+    }
+
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.post(url, headers=headers, json=req_data) as resp:
+                if resp.ok:
+                    return await resp.json()
+                else:
+                    resp_content_b = await resp.content.read()
+                    raise HTTPException(
+                        status_code=resp.status,
+                        detail=resp_content_b.decode("utf-8"),
+                    )
+        except aiohttp.ClientConnectorError as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Network connection error to Audiobookshelf server: {e}",
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"An unexpected error occurred while syncing sessions: {e}",
+            )
 
 
 async def set_progress(data):

@@ -141,6 +141,12 @@ async def akniga_set_progress(
 
 
 # *****************************************************************************
+@app.post("/audiobookshelf/sync_sessions")
+async def sync_sessions(data: abs.AudiobookshelfSessions):
+    return await abs.sync_sessions(data)
+
+
+# *****************************************************************************
 @app.get("/")
 async def root():
     return {"message": "OK"}
