@@ -3,3 +3,5 @@ fastapi[standard]
 aiohttp[speedups]
 telethon
 python-socks[asyncio]
+# Required by the cover-image handler (audioimage/redused_api.get_cover).
+Pillow

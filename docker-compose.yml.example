@@ -38,6 +38,11 @@ services:
       - TELEGRAM_API_HASH=
       # Get it from the bot https://t.me/BotFather
       - TELEGRAM_BOT_TOKEN=
+     # OPTIONAL: default destination chat for the /send_telegram_message forwarder.
+     # When set, all forwards go here; when empty the client-supplied chat_id is
+     # used. If TELEGRAM_BOT_TOKEN is empty the forwarder is a safe no-op that
+     # still returns success to the client app without any outbound call.
+     #- TELEGRAM_CHAT_ID=
 
       # Optional. Proxy for connecting the bot. If specified, it will attempt to connect through a proxy.
       #- TELEGRAM_PROXY_HOST=127.0.0.1

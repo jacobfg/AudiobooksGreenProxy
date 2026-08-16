@@ -1,10 +1,12 @@
 import uuid
 from math import e
+import io
 import aiohttp
 import tempfile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi import HTTPException
 from pydantic import BaseModel
+from PIL import Image
 import os
 
 
@@ -55,7 +57,7 @@ def sanitze_server_name(server):
     result = server
     if not result.startswith("https://"):
         result = "https://" + result
-    if "/" in result[-1]:
+    if result.endswith("/"):
         result = result[:-1]
     return result
 
@@ -237,9 +239,19 @@ async def login(server, login, password):
                 if resp.ok:
                     resp_json = await resp.json()
                     keys_list = ["token", "refreshToken", "accessToken"]
-                    for key_name in keys_list:
-                        if key_name in resp_json["user"].keys():
-                            result[key_name] = resp_json["user"][key_name]
+                     # With the x-return-tokens header, Audiobookshelf returns
+                     # tokens at the top level under "tokens" (not under "user").
+                     # Support both layouts so we read whichever is present.
+                    tokens = resp_json.get("tokens")
+                    user = resp_json.get("user") if isinstance(resp_json, dict) else None
+                    if isinstance(tokens, dict):
+                        for key_name in keys_list:
+                            if key_name in tokens:
+                                result[key_name] = tokens[key_name]
+                    if isinstance(user, dict):
+                        for key_name in keys_list:
+                            if key_name in user and key_name not in result:
+                                result[key_name] = user[key_name]
                 else:
                     resp_content_b = await resp.content.read()
                     raise HTTPException(
@@ -329,7 +341,13 @@ async def get_cover(url):
                     detail=f"An unexpected error occurred while fetching cover: {e}",
                 )
 
-    return None
+    # URL did not match a known cover/preview pattern: return an explicit 204
+    # instead of leaking a null body the client may misread.
+    return FileResponse(
+        os.devnull,
+        media_type="image/jpeg",
+        status_code=204,
+     )
 
 
 async def sync_sessions(data):
