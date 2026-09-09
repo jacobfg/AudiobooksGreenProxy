@@ -8,9 +8,8 @@ services:
     volumes:
       # Здесь будут храниться данные
       - ./data:/app/data
-      # Read-only, watch-compatible media cache. See README_en.md for its
-      # per-book manifest format. Cache creation/transcoding is external.
-      - ./media-cache:/app/cache:ro
+      # Writable Garmin media cache. The proxy can build missing books here.
+      - ./media-cache:/app/cache
      
     #Если телеграм бот будет использовать прокси, который запущен
     #на хосте, на котором крутится docker, нужно определить хосте
@@ -37,6 +36,11 @@ services:
       - SERVER_ENDPOINT=
       # Optional only when a different in-container cache path is mounted.
       - CACHE_DIR=/app/cache
+      # Build missing playlist books in the background. The first watch sync
+      # can show no files while conversion runs; sync again once it completes.
+      - AUTO_CACHE_ENABLED=true
+      - AUTO_CACHE_MAX_JOBS=1
+      - AUTO_CACHE_CHAPTER_MINUTES=30
 
       # *****************************************************************************
       # Variables for launching the Telegram bot.

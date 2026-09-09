@@ -68,6 +68,10 @@ else:
 # Audiobookshelf
 
 import audiobookshelf.redused_api as abs
+from utils.cache_builder import CacheBuilder
+
+
+cache_builder = CacheBuilder()
 
 
 # *****************************************************************************
@@ -102,7 +106,9 @@ async def audiobookshelf_playlist(
         description="Header Authorization: Bearer your_token_here",
     ),
 ):
-    return await abs.get_playlist(server, playlist_id, abs.clear_token(token))
+    books = await abs.get_playlist(server, playlist_id, abs.clear_token(token))
+    cache_builder.queue_missing_books(server, abs.clear_token(token), books)
+    return books
 
 
 # *****************************************************************************
