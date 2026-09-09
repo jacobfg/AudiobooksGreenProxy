@@ -1,6 +1,6 @@
 import asyncio
 import uvicorn
-from fastapi import FastAPI, Header, Query
+from fastapi import FastAPI, Header, Query, Request
 from typing import Optional
 import os
 import logging
@@ -119,6 +119,31 @@ async def audiobookshelf_book(
     ),
 ):
     return await abs.get_book(server, book_id, abs.clear_token(token), skip, limit)
+
+
+# These routes have the same shape as the ABS URLs used directly by the app.
+# SERVER_ENDPOINT makes them forward to the private ABS instance rather than
+# back to this public proxy.
+@app.get("/api/me/progress/{book_id}")
+async def audiobookshelf_progress(
+    book_id: str,
+    token: Optional[str] = Header(None, alias="Authorization"),
+):
+    return await abs.get_progress(book_id, token)
+
+
+@app.get("/api/items/{book_id}/cover")
+async def audiobookshelf_book_cover(
+    book_id: str,
+    request: Request,
+    token: Optional[str] = Header(None, alias="Authorization"),
+):
+    return await abs.get_book_cover(book_id, token, dict(request.query_params))
+
+
+@app.get("/api/items/{book_id}/file/{file_id}/download")
+async def cached_media_download(book_id: str, file_id: str):
+    return abs.get_cached_media_response(book_id, file_id)
 
 
 # *****************************************************************************

@@ -2,12 +2,15 @@ services:
   audiobooks_green_proxy:
     image: ghcr.io/fabrikant/audiobooks_green_proxy:latest
     container_name: audiobooks_green_proxy
-    init:true
+    init: true
     ports:
       - "8081:8081"
     volumes:
       # Здесь будут храниться данные
       - ./data:/app/data
+      # Read-only, watch-compatible media cache. See README_en.md for its
+      # per-book manifest format. Cache creation/transcoding is external.
+      - ./media-cache:/app/cache:ro
      
     #Если телеграм бот будет использовать прокси, который запущен
     #на хосте, на котором крутится docker, нужно определить хосте
@@ -28,6 +31,12 @@ services:
       # • trace (very verbose debug messages, including request/response bodies, added in recent Uvicorn versions)
       # The log level for the entire application is also set based on this variable
       - LOG_LEVEL=warning
+
+      # Private URL of the real Audiobookshelf instance. Required when the
+      # Garmin app uses this proxy as both its Server and Proxy URL.
+      - SERVER_ENDPOINT=
+      # Optional only when a different in-container cache path is mounted.
+      - CACHE_DIR=/app/cache
 
       # *****************************************************************************
       # Variables for launching the Telegram bot.
