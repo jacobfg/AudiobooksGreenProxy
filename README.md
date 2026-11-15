@@ -69,3 +69,9 @@ export SSL_PRIVATE_KEY_FILE=./data/privkey.pem
 ```
 python3 books_proxy.py 
 ```
+
+
+## Container releases
+
+Image publication runs on `release: published` for stable releases. Branch and tag
+pushes do not publish images.
